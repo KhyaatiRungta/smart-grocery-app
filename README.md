@@ -43,10 +43,13 @@ smart-grocery-app/
 
 ```
 pending_payment ──pay──▶ placed ──▶ confirmed ──▶ packed ──▶ out_for_delivery ──▶ delivered
-      │                    │            │
-      ├─expire─▶ expired   └──cancel──▶ cancelled ◀──cancel──┘   (cancel allowed until packed)
-      └──cancel──▶ cancelled
+      │    │                │           │
+      │    └──expire──▶ expired         │
+      │                     │           │
+      └──────────cancel─────┴───────────┴──▶ cancelled
 ```
+
+Cancellation is allowed from `pending_payment`, `placed` and `confirmed`, that is, until the order is packed.
 
 Illegal moves return `409`. Every change is written to `order_events` and creates a notification.
 
@@ -142,35 +145,39 @@ See `.env.example`. The main settings:
 | Method | Path | Notes |
 | --- | --- | --- |
 | POST | `/api/auth/register`, `/api/auth/login` | Returns a bearer token |
-| GET, PUT | `/api/me`, `/api/me/store` | Current user; choose the store |
+| GET | `/api/me` | Current user |
+| PUT | `/api/me/store` | Choose the store |
 | GET | `/api/categories`, `/api/stores`, `/api/stores/{id}` | Reference data |
 | GET | `/api/products` | `q`, `category`, `min_price_cents`, `max_price_cents`, `in_stock`, `store_id`, `sort`, `page`, `page_size` |
 | GET | `/api/products/{id}` | Optional `store_id` for availability |
-| GET, POST | `/api/cart`, `/api/cart/items` | Per-store bag |
+| GET | `/api/cart` | Per-store bag |
+| POST | `/api/cart/items` | Add an item |
 | PUT, DELETE | `/api/cart/items/{product_id}` | Set quantity (0 removes) |
 | POST | `/api/checkout` | **Requires `Idempotency-Key`.** Reserves stock, returns `pending_payment` |
 | POST | `/api/orders/{id}/pay` | Simulated payment, moves the order to `placed` |
-| GET | `/api/orders?scope=active\|past\|all` | Order history |
+| GET | `/api/orders` | Order history. `scope` is `active`, `past` or `all` |
 | GET | `/api/orders/{id}` | Detail and timeline. Also catches up simulated fulfilment |
 | POST | `/api/orders/{id}/cancel` | Cancel before packing |
 | POST | `/api/notifications/devices` | Register an Expo push token |
-| GET | `/api/notifications`, POST `/api/notifications/{id}/read`, `/read-all` | In-app feed |
+| GET | `/api/notifications` | In-app feed |
+| POST | `/api/notifications/{id}/read`, `/api/notifications/read-all` | Mark as read |
 
 ## Project layout
 
 ```
-backend/app/
-  main.py            app factory, lifespan (create tables, seed, ticker)
-  models.py          SQLAlchemy models (stock has an explicit `reserved` column)
-  services/orders.py state machine, stock locking, idempotent checkout, pay, cancel, sync
-  services/notifications.py   notification records and Expo push delivery
-  routers/           HTTP layer
-  seed.py, catalog_data.py    demo data
-backend/tests/       pytest suite against real PostgreSQL
-mobile/src/app/      expo-router screens (auth, tabs, product, checkout, order, stores, notifications)
-mobile/src/api/      fetch client, types, TanStack Query hooks
-mobile/src/components/ shared UI
-mobile/src/theme.ts  design tokens
+backend/
+  app/
+    main.py                  app factory, lifespan (create tables, seed, ticker)
+    models.py                SQLAlchemy models (stock has an explicit `reserved` column)
+    services/
+      orders.py              state machine, stock locking, idempotent checkout, pay, cancel, sync
+      notifications.py       notification records and Expo push delivery
+    routers/                 HTTP layer
+    seed.py, catalog_data.py demo data
+  tests/                     pytest suite against real PostgreSQL
+mobile/src/
+  app/                       expo-router screens (auth, tabs, product, checkout, order, stores, notifications)
+  api/                       fetch client, types, TanStack Query hooks
+  components/                shared UI
+  theme.ts                   design tokens
 ```
-#   s m a r t - g r o c e r y - a p p  
- 
